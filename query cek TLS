@@ -1,0 +1,42 @@
+QUERY UNTUK CEK TLS BERAPA YANG DIPAKE
+SELECT
+    c.session_id,
+    s.host_name,
+    s.program_name,
+    s.login_name,
+    c.client_net_address,
+    c.net_transport,
+    c.encrypt_option,
+    c.auth_scheme,
+    c.protocol_version,
+    CASE 
+        WHEN c.protocol_version IN (0, 1) THEN 'Unknown/Non-TLS'
+        WHEN c.protocol_version < 16777216 THEN 
+            CASE 
+                WHEN c.protocol_version = 0x0300 THEN 'SSL 3.0'
+                WHEN c.protocol_version = 0x0301 THEN 'TLS 1.0'
+                WHEN c.protocol_version = 0x0302 THEN 'TLS 1.1'
+                WHEN c.protocol_version = 0x0303 THEN 'TLS 1.2'
+                WHEN c.protocol_version = 0x0304 THEN 'TLS 1.3'
+                ELSE 'Other'
+            END
+        ELSE
+            CASE 
+                WHEN c.protocol_version % 256 = 0 THEN 'SSL 3.0'
+                WHEN c.protocol_version % 256 = 1 THEN 'TLS 1.0'
+                WHEN c.protocol_version % 256 = 2 THEN 'TLS 1.1'
+                WHEN c.protocol_version % 256 = 3 THEN 'TLS 1.2'
+                WHEN c.protocol_version % 256 = 4 THEN 'TLS 1.3'
+                ELSE 'Other'
+            END
+    END AS tls_version
+FROM sys.dm_exec_connections AS c
+LEFT JOIN sys.dm_exec_sessions AS s
+    ON c.session_id = s.session_id
+WHERE s.host_name IS NOT NULL
+-- Opsional: filter hanya host Genesys
+-- AND s.host_name LIKE '%GENESYS%'
+ORDER BY
+    tls_version DESC,
+    encrypt_option DESC,
+    s.host_name;
